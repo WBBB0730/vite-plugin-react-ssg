@@ -9,6 +9,7 @@ pnpm add vite-plugin-react-ssg react-router
 ```
 
 确保项目中已经安装并使用了 `react`、`react-dom`、`vite`。
+路由模式要求 React Router v6.4+ 的 data router API。
 
 ## 使用方式
 
@@ -26,7 +27,7 @@ export default defineConfig({
 
 ### 2. 创建 `react-ssg.config.ts`
 
-如果你的应用由 React Router 路由驱动，使用路由模式：
+如果你的应用由 React Router v6.4+ data router 路由驱动，使用路由模式：
 
 ```ts
 import { defineReactSsgConfig } from 'vite-plugin-react-ssg/config'
@@ -104,7 +105,7 @@ type ReactSsgUserConfigExport =
 配置项说明：
 
 - `history`：仅路由模式可用。`browser` 会根据 `routes` 自动发现静态路径；`hash` 只会预渲染 `/`。
-- `routes`：仅路由模式可用，类型必须是 React Router 的 `RouteObject[]`。
+- `routes`：仅路由模式可用，类型必须是 React Router v6.4+ data router 的 `RouteObject[]`。
 - `paths`：仅路由模式可用，用于补充需要预渲染的额外路径，通常用于动态路由。
 - `app`：仅单页模式可用，类型为 React 组件。
 - `context.command`：固定为 `'build'`。
@@ -114,7 +115,7 @@ type ReactSsgUserConfigExport =
 
 - 单页模式只会预渲染 `/`。
 - 路由模式下如果 `history: 'hash'`，只会预渲染 `/`。
-- 路由模式下如果 `history: 'browser'`，会从 `routes` 自动发现静态路径，并与 `paths` 合并。
+- 路由模式下如果 `history: 'browser'`，会从 v6.4+ data router `routes` 自动发现静态路径，并与 `paths` 合并。
 - `/` 会输出到 `dist/index.html`，其他路径会输出到 `dist/<path>/index.html`。
 
 ## 回退行为
@@ -122,6 +123,7 @@ type ReactSsgUserConfigExport =
 - 如果缺少 `react-ssg.config.ts`，会跳过预渲染并保留普通 CSR 构建结果。
 - 如果配置无效或加载失败，会跳过预渲染并保留普通 CSR 构建结果。
 - 如果某个目标路径渲染失败，只会跳过当前路径，其它路径会继续预渲染。
+- React Router v5 和 v6.4 之前的声明式路由模式不在支持范围内。
 
 ## 参与贡献
 

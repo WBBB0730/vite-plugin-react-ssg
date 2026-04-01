@@ -83,7 +83,7 @@ async function buildProject(root: string): Promise<void> {
   })
 }
 
-function createRouteModeFiles(options: {
+function createDataRouterModeFiles(options: {
   history: 'browser' | 'hash'
   configBody: string
   routesBody: string
@@ -189,9 +189,9 @@ describe('vite-plugin-react-ssg', () => {
     expect(warn).toHaveBeenCalled()
   })
 
-  test('browser 路由模式会输出静态路由和 paths 指定的动态路径', async () => {
+  test('browser data router 路由模式会输出静态路由和 paths 指定的动态路径', async () => {
     const project = await createProject(
-      createRouteModeFiles({
+      createDataRouterModeFiles({
         history: 'browser',
         configBody: [
           'export default defineReactSsgConfig({',
@@ -241,9 +241,9 @@ describe('vite-plugin-react-ssg', () => {
     expect(postHtml).toContain('1')
   })
 
-  test('hash 路由模式只输出默认首屏', async () => {
+  test('hash data router 路由模式只输出默认首屏', async () => {
     const project = await createProject(
-      createRouteModeFiles({
+      createDataRouterModeFiles({
         history: 'hash',
         configBody: [
           'export default defineReactSsgConfig({',
@@ -318,7 +318,7 @@ describe('vite-plugin-react-ssg', () => {
   test('单个页面预渲染失败时只跳过当前页面', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const project = await createProject(
-      createRouteModeFiles({
+      createDataRouterModeFiles({
         history: 'browser',
         configBody: [
           'export default defineReactSsgConfig({',

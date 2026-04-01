@@ -9,6 +9,7 @@ pnpm add vite-plugin-react-ssg react-router
 ```
 
 Make sure your project already installs and uses `react`, `react-dom`, and `vite`.
+Route mode requires React Router v6.4+ data router APIs.
 
 ## Usage
 
@@ -26,7 +27,7 @@ export default defineConfig({
 
 ### 2. Create `react-ssg.config.ts`
 
-Use route mode when your app is driven by React Router routes:
+Use route mode when your app is driven by React Router v6.4+ data router routes:
 
 ```ts
 import { defineReactSsgConfig } from 'vite-plugin-react-ssg/config'
@@ -103,7 +104,7 @@ type ReactSsgUserConfigExport =
 Config fields:
 
 - `history`: Route mode only. `browser` discovers static paths from `routes`; `hash` only prerenders `/`.
-- `routes`: Route mode only. Must be a React Router `RouteObject[]`.
+- `routes`: Route mode only. Must be a React Router v6.4+ data router `RouteObject[]`.
 - `paths`: Route mode only. Extra paths to prerender, typically used for dynamic routes.
 - `app`: App mode only. A React component used as the single-page entry.
 - `context.command`: Always `'build'`.
@@ -113,7 +114,7 @@ Config fields:
 
 - In app mode, only `/` is prerendered.
 - In route mode with `history: 'hash'`, only `/` is prerendered.
-- In route mode with `history: 'browser'`, static paths are discovered from `routes` and merged with `paths`.
+- In route mode with `history: 'browser'`, static paths are discovered from v6.4+ data router `routes` and merged with `paths`.
 - `/` is written to `dist/index.html`; other paths are written to `dist/<path>/index.html`.
 
 ## Fallback Behavior
@@ -121,6 +122,7 @@ Config fields:
 - If `react-ssg.config.ts` is missing, prerendering is skipped and the normal CSR build output is kept.
 - If the config is invalid or cannot be loaded, prerendering is skipped and the normal CSR build output is kept.
 - If a single target path fails to render, only that path is skipped and the plugin continues prerendering the rest.
+- React Router v5 and pre-6.4 declarative router setups are out of scope.
 
 ## Contributing
 

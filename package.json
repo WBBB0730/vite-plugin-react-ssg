@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.0.0",
   "description": "A build-time prerendering plugin that generates static HTML for traditional Vite React SPAs.",
-  "author": "wbbb",
+  "author": "WBBB",
   "license": "MIT",
   "exports": {
     ".": "./dist/index.mjs",
@@ -28,7 +28,7 @@
   "peerDependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-router": "^7.13.2",
+    "react-router": "^6.4.0 || ^7.0.0",
     "vite": "^8.0.3"
   },
   "devDependencies": {
