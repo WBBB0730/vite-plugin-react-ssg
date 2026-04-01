@@ -1,14 +1,16 @@
 import path from 'node:path'
 import type { Plugin, ResolvedConfig } from 'vite'
+import type { ReactSsgLogLevel } from './config'
+import { createReactSsgLogger } from './logger'
 import { loadReactSsgConfig } from './load-config'
 import { prerenderBuild } from './prerender'
 
-function warn(message: string): void {
-  console.warn(`[vite-plugin-react-ssg] ${message}`)
-}
-
 export function reactSsg(): Plugin {
   let resolvedConfig: ResolvedConfig
+
+  function createLogger(logLevel: ReactSsgLogLevel) {
+    return createReactSsgLogger({ logLevel })
+  }
 
   return {
     name: 'vite-plugin-react-ssg',
@@ -28,18 +30,23 @@ export function reactSsg(): Plugin {
       })
 
       if (loadedConfig.kind !== 'ok') {
-        warn(loadedConfig.message)
+        createLogger('normal').warn(loadedConfig.message)
         return
       }
 
-      await prerenderBuild({
+      const logger = createLogger(loadedConfig.config.logLevel)
+      const summary = await prerenderBuild({
         outDir: path.resolve(resolvedConfig.root, resolvedConfig.build.outDir),
         config: loadedConfig.config,
+        onStart({ totalRoutes }) {
+          logger.startPrerender(totalRoutes)
+        },
         onWarning({ targetPath, error }) {
-          const message = error instanceof Error ? error.message : String(error)
-          warn(`预渲染 ${targetPath} 失败，已回退到 CSR：${message}`)
+          logger.warnPrerenderFailure(targetPath, error)
         },
       })
+
+      logger.finishPrerender(summary)
     },
   }
 }

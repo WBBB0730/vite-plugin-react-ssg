@@ -37,6 +37,7 @@ export default defineReactSsgConfig({
   history: 'browser',
   routes,
   paths: ['/posts/hello-world'],
+  logLevel: 'normal',
 })
 ```
 
@@ -48,6 +49,7 @@ import { App } from './src/App'
 
 export default defineReactSsgConfig({
   app: App,
+  logLevel: 'normal',
 })
 ```
 
@@ -78,6 +80,7 @@ import type { ComponentType } from 'react'
 import type { RouteObject } from 'react-router'
 
 type HistoryMode = 'browser' | 'hash'
+type ReactSsgLogLevel = 'silent' | 'normal' | 'verbose'
 
 interface ReactSsgConfigContext {
   command: 'build'
@@ -88,10 +91,12 @@ interface RouteConfigInput {
   history: HistoryMode
   routes: RouteObject[]
   paths?: string[]
+  logLevel?: ReactSsgLogLevel
 }
 
 interface AppConfigInput {
   app: ComponentType
+  logLevel?: ReactSsgLogLevel
 }
 
 type ReactSsgUserConfig = RouteConfigInput | AppConfigInput
@@ -107,8 +112,15 @@ Config fields:
 - `routes`: Route mode only. Must be a React Router v6.4+ data router `RouteObject[]`.
 - `paths`: Route mode only. Extra paths to prerender, typically used for dynamic routes.
 - `app`: App mode only. A React component used as the single-page entry.
+- `logLevel`: Optional. Controls build output verbosity. Defaults to `normal`.
 - `context.command`: Always `'build'`.
 - `context.mode`: The current Vite mode.
+
+`logLevel` options:
+
+- `silent`: Suppresses the banner, phase logs, completed summary, and route result list.
+- `normal`: Prints the banner, phase log, warnings, and a single-line completed summary.
+- `verbose`: Prints the same output as `normal`, then appends a `Route (prerender)` result list after the completed summary.
 
 ## Prerendering Behavior
 

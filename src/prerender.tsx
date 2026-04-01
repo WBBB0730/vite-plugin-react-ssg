@@ -8,6 +8,10 @@ import {
   type RouteObject,
 } from 'react-router'
 import type { ResolvedReactSsgConfig } from './load-config'
+import type {
+  PrerenderRouteResult,
+  PrerenderSummary,
+} from './logger'
 import { discoverStaticPaths } from './route-paths'
 
 export interface PrerenderWarning {
@@ -63,11 +67,17 @@ function getOutputFilePath(outDir: string, targetPath: string): string {
 export async function prerenderBuild(options: {
   outDir: string
   config: ResolvedReactSsgConfig
+  onStart?: (event: { totalRoutes: number }) => void
   onWarning: (warning: PrerenderWarning) => void
-}): Promise<void> {
+}): Promise<PrerenderSummary> {
   const templatePath = path.join(options.outDir, 'index.html')
   const template = await readFile(templatePath, 'utf8')
   const targetPaths = resolveTargetPaths(options.config)
+  const routes: PrerenderRouteResult[] = []
+  let prerendered = 0
+  let skipped = 0
+
+  options.onStart?.({ totalRoutes: targetPaths.length })
 
   for (const targetPath of targetPaths) {
     try {
@@ -76,12 +86,29 @@ export async function prerenderBuild(options: {
 
       await mkdir(path.dirname(outputPath), { recursive: true })
       await writeFile(outputPath, html)
+      prerendered += 1
+      routes.push({
+        targetPath,
+        status: 'prerendered',
+      })
     }
     catch (error) {
+      skipped += 1
+      routes.push({
+        targetPath,
+        status: 'skipped',
+      })
       options.onWarning({
         targetPath,
         error,
       })
     }
+  }
+
+  return {
+    total: targetPaths.length,
+    prerendered,
+    skipped,
+    routes,
   }
 }

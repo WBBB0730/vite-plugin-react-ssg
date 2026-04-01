@@ -83,6 +83,19 @@ async function buildProject(root: string): Promise<void> {
   })
 }
 
+function collectMessages(spy: ReturnType<typeof vi.spyOn>): string[] {
+  return spy.mock.calls.flatMap(call =>
+    call.map(value => String(value)),
+  )
+}
+
+function expectMessages(
+  spy: ReturnType<typeof vi.spyOn>,
+  messages: string[],
+): void {
+  expect(collectMessages(spy)).toEqual(messages)
+}
+
 function createDataRouterModeFiles(options: {
   history: 'browser' | 'hash'
   configBody: string
@@ -125,6 +138,7 @@ afterEach(async () => {
 
 describe('vite-plugin-react-ssg', () => {
   test('缺少 react-ssg.config.ts 时回退到普通 CSR 构建', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const project = await createProject({
       'src/main.tsx': [
@@ -148,9 +162,14 @@ describe('vite-plugin-react-ssg', () => {
 
     expect(html).not.toContain('CSR 首页')
     expect(warn).toHaveBeenCalled()
+    expectMessages(log, ['▲ React SSG', ''])
+    expectMessages(warn, [
+      '⚠ Skipping prerendering because react-ssg.config.ts was not found. Keeping the default CSR build output.',
+    ])
   })
 
   test('非法配置时回退到普通 CSR 构建', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const project = await createProject({
       'src/main.tsx': [
@@ -187,9 +206,15 @@ describe('vite-plugin-react-ssg', () => {
 
     expect(html).not.toContain('非法配置页面')
     expect(warn).toHaveBeenCalled()
+    expectMessages(log, ['▲ React SSG', ''])
+    expectMessages(warn, [
+      '⚠ Invalid react-ssg.config.ts: declare either routes or app, but not both.',
+    ])
   })
 
-  test('browser data router 路由模式会输出静态路由和 paths 指定的动态路径', async () => {
+  test('未声明 logLevel 时默认使用 normal 输出并预渲染静态路由和 paths 指定的动态路径', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const project = await createProject(
       createDataRouterModeFiles({
         history: 'browser',
@@ -239,6 +264,14 @@ describe('vite-plugin-react-ssg', () => {
     const postHtml = await project.readDistFile('posts/1/index.html')
     expect(postHtml).toContain('文章')
     expect(postHtml).toContain('1')
+    expectMessages(log, [
+      '▲ React SSG',
+      '',
+      '- Generating static HTML for 3 route(s)',
+      '',
+      '✓ Static HTML generation completed: 3 total, 3 prerendered, 0 skipped',
+    ])
+    expectMessages(warn, [])
   })
 
   test('hash data router 路由模式只输出默认首屏', async () => {
@@ -315,7 +348,8 @@ describe('vite-plugin-react-ssg', () => {
     expect(await project.readDistFile('index.html')).toContain('单页预渲染')
   })
 
-  test('单个页面预渲染失败时只跳过当前页面', async () => {
+  test('silent 模式会抑制常规构建日志', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const project = await createProject(
       createDataRouterModeFiles({
@@ -323,6 +357,41 @@ describe('vite-plugin-react-ssg', () => {
         configBody: [
           'export default defineReactSsgConfig({',
           "  history: 'browser',",
+          "  logLevel: 'silent',",
+          '  routes,',
+          '})',
+        ].join('\n'),
+        routesBody: [
+          'function HomePage() { return <p>Silent 首页</p> }',
+          '',
+          'export const routes = [',
+          '  {',
+          "    path: '/',",
+          '    Component: HomePage,',
+          '  },',
+          ']',
+          '',
+        ].join('\n'),
+      }),
+    )
+
+    await buildProject(project.root)
+
+    expect(await project.readDistFile('index.html')).toContain('Silent 首页')
+    expectMessages(log, [])
+    expectMessages(warn, [])
+  })
+
+  test('normal 模式下单个页面预渲染失败时只跳过当前页面', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const project = await createProject(
+      createDataRouterModeFiles({
+        history: 'browser',
+        configBody: [
+          'export default defineReactSsgConfig({',
+          "  history: 'browser',",
+          "  logLevel: 'normal',",
           '  routes,',
           '})',
         ].join('\n'),
@@ -358,6 +427,77 @@ describe('vite-plugin-react-ssg', () => {
     expect(await project.readDistFile('index.html')).toContain('正常首页')
     expect(await project.readDistFile('ok/index.html')).toContain('正常页面')
     expect(await project.hasDistFile('boom/index.html')).toBe(false)
-    expect(warn).toHaveBeenCalled()
+    expectMessages(log, [
+      '▲ React SSG',
+      '',
+      '- Generating static HTML for 3 route(s)',
+      '',
+      '✓ Static HTML generation completed: 3 total, 2 prerendered, 1 skipped',
+    ])
+    expectMessages(warn, [
+      '⚠ Failed to prerender /boom. Falling back to CSR for this route. Reason: boom',
+    ])
+  })
+
+  test('verbose 模式会在 completed 摘要后追加逐路由结果列表', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const project = await createProject(
+      createDataRouterModeFiles({
+        history: 'browser',
+        configBody: [
+          'export default defineReactSsgConfig({',
+          "  history: 'browser',",
+          "  logLevel: 'verbose',",
+          '  routes,',
+          '})',
+        ].join('\n'),
+        routesBody: [
+          "import { Outlet } from 'react-router'",
+          '',
+          'function Layout() {',
+          '  return <div><Outlet /></div>',
+          '}',
+          '',
+          'function HomePage() { return <p>Verbose 首页</p> }',
+          'function OkPage() { return <p>Verbose 页面</p> }',
+          'function BoomPage() { throw new Error(\'boom\') }',
+          '',
+          'export const routes = [',
+          '  {',
+          "    path: '/',",
+          '    Component: Layout,',
+          '    children: [',
+          '      { index: true, Component: HomePage },',
+          "      { path: 'ok', Component: OkPage },",
+          "      { path: 'boom', Component: BoomPage },",
+          '    ],',
+          '  },',
+          ']',
+          '',
+        ].join('\n'),
+      }),
+    )
+
+    await buildProject(project.root)
+
+    expect(await project.readDistFile('index.html')).toContain('Verbose 首页')
+    expect(await project.readDistFile('ok/index.html')).toContain('Verbose 页面')
+    expect(await project.hasDistFile('boom/index.html')).toBe(false)
+    expectMessages(log, [
+      '▲ React SSG',
+      '',
+      '- Generating static HTML for 3 route(s)',
+      '',
+      '✓ Static HTML generation completed: 3 total, 2 prerendered, 1 skipped',
+      '',
+      'Route (prerender)',
+      '○ /',
+      '○ /ok',
+      '× /boom',
+    ])
+    expectMessages(warn, [
+      '⚠ Failed to prerender /boom. Falling back to CSR for this route. Reason: boom',
+    ])
   })
 })

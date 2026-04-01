@@ -37,6 +37,7 @@ export default defineReactSsgConfig({
   history: 'browser',
   routes,
   paths: ['/posts/hello-world'],
+  logLevel: 'normal',
 })
 ```
 
@@ -48,6 +49,7 @@ import { App } from './src/App'
 
 export default defineReactSsgConfig({
   app: App,
+  logLevel: 'normal',
 })
 ```
 
@@ -79,6 +81,7 @@ import type { ComponentType } from 'react'
 import type { RouteObject } from 'react-router'
 
 type HistoryMode = 'browser' | 'hash'
+type ReactSsgLogLevel = 'silent' | 'normal' | 'verbose'
 
 interface ReactSsgConfigContext {
   command: 'build'
@@ -89,10 +92,12 @@ interface RouteConfigInput {
   history: HistoryMode
   routes: RouteObject[]
   paths?: string[]
+  logLevel?: ReactSsgLogLevel
 }
 
 interface AppConfigInput {
   app: ComponentType
+  logLevel?: ReactSsgLogLevel
 }
 
 type ReactSsgUserConfig = RouteConfigInput | AppConfigInput
@@ -108,8 +113,15 @@ type ReactSsgUserConfigExport =
 - `routes`：仅路由模式可用，类型必须是 React Router v6.4+ data router 的 `RouteObject[]`。
 - `paths`：仅路由模式可用，用于补充需要预渲染的额外路径，通常用于动态路由。
 - `app`：仅单页模式可用，类型为 React 组件。
+- `logLevel`：可选，控制构建日志粒度，默认值为 `normal`。
 - `context.command`：固定为 `'build'`。
 - `context.mode`：当前 Vite 的运行模式。
+
+`logLevel` 可选值：
+
+- `silent`：不输出标题、阶段日志、完成摘要和逐路由结果列表。
+- `normal`：输出标题、阶段日志、警告以及单行完成摘要。
+- `verbose`：先输出与 `normal` 完全一致的内容，再在完成摘要后追加 `Route (prerender)` 结果列表。
 
 ## 预渲染行为
 

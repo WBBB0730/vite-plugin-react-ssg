@@ -7,6 +7,7 @@ import type {
   AppConfigInput,
   HistoryMode,
   ReactSsgConfigContext,
+  ReactSsgLogLevel,
   ReactSsgUserConfig,
   ReactSsgUserConfigExport,
   RouteConfigInput,
@@ -18,11 +19,13 @@ export interface ResolvedRouteConfig {
   history: HistoryMode
   routes: RouteObject[]
   paths: string[]
+  logLevel: ReactSsgLogLevel
 }
 
 export interface ResolvedAppConfig {
   mode: 'app'
   app: ComponentType
+  logLevel: ReactSsgLogLevel
 }
 
 export type ResolvedReactSsgConfig = ResolvedRouteConfig | ResolvedAppConfig
@@ -64,18 +67,39 @@ function resolveExportedConfig(
   return exportedConfig
 }
 
+function normalizeLogLevel(value: unknown): ReactSsgLogLevel | null {
+  if (value === undefined) {
+    return 'normal'
+  }
+
+  if (value === 'silent' || value === 'normal' || value === 'verbose') {
+    return value
+  }
+
+  return null
+}
+
 function validateConfig(config: unknown): ConfigLoadResult {
   if (!config || typeof config !== 'object') {
     return {
       kind: 'invalid',
-      message: 'react-ssg.config.ts 必须导出一个有效的配置对象。',
+      message: 'Invalid react-ssg.config.ts: export a valid configuration object.',
+    }
+  }
+
+  const logLevel = normalizeLogLevel((config as { logLevel?: unknown }).logLevel)
+
+  if (!logLevel) {
+    return {
+      kind: 'invalid',
+      message: 'Invalid react-ssg.config.ts: logLevel must be "silent", "normal", or "verbose".',
     }
   }
 
   if (isRouteConfig(config as ReactSsgUserConfig) && isAppConfig(config as ReactSsgUserConfig)) {
     return {
       kind: 'invalid',
-      message: 'react-ssg.config.ts 不能同时声明 routes 和 app。',
+      message: 'Invalid react-ssg.config.ts: declare either routes or app, but not both.',
     }
   }
 
@@ -85,14 +109,14 @@ function validateConfig(config: unknown): ConfigLoadResult {
     if (routeConfig.history !== 'browser' && routeConfig.history !== 'hash') {
       return {
         kind: 'invalid',
-        message: '路由模式必须声明 history: "browser" 或 "hash"。',
+        message: 'Invalid react-ssg.config.ts: route mode requires history to be set to "browser" or "hash".',
       }
     }
 
     if (!Array.isArray(routeConfig.routes)) {
       return {
         kind: 'invalid',
-        message: '路由模式必须提供 routes 数组。',
+        message: 'Invalid react-ssg.config.ts: route mode requires a routes array.',
       }
     }
 
@@ -103,6 +127,7 @@ function validateConfig(config: unknown): ConfigLoadResult {
         history: routeConfig.history,
         routes: routeConfig.routes,
         paths: normalizeUserPaths(routeConfig.paths),
+        logLevel,
       },
     }
   }
@@ -113,7 +138,7 @@ function validateConfig(config: unknown): ConfigLoadResult {
     if (typeof appConfig.app !== 'function') {
       return {
         kind: 'invalid',
-        message: '单页模式必须提供可渲染的 app 组件。',
+        message: 'Invalid react-ssg.config.ts: app mode requires a renderable app component.',
       }
     }
 
@@ -122,13 +147,14 @@ function validateConfig(config: unknown): ConfigLoadResult {
       config: {
         mode: 'app',
         app: appConfig.app,
+        logLevel,
       },
     }
   }
 
   return {
     kind: 'invalid',
-    message: 'react-ssg.config.ts 必须声明 routes 或 app。',
+    message: 'Invalid react-ssg.config.ts: declare either routes or app.',
   }
 }
 
@@ -143,7 +169,7 @@ export async function loadReactSsgConfig(
   catch {
     return {
       kind: 'missing',
-      message: '未找到 react-ssg.config.ts，已跳过预渲染并回退到普通 CSR 构建。',
+      message: 'Skipping prerendering because react-ssg.config.ts was not found. Keeping the default CSR build output.',
     }
   }
 
@@ -168,7 +194,7 @@ export async function loadReactSsgConfig(
     if (!exportedConfig) {
       return {
         kind: 'invalid',
-        message: 'react-ssg.config.ts 必须使用 default export 导出配置。',
+        message: 'Invalid react-ssg.config.ts: use a default export for the configuration.',
       }
     }
 
@@ -181,11 +207,11 @@ export async function loadReactSsgConfig(
   }
   catch (error) {
     const message =
-      error instanceof Error ? error.message : '未知错误'
+      error instanceof Error ? error.message : 'Unknown error'
 
     return {
       kind: 'invalid',
-      message: `加载 react-ssg.config.ts 失败：${message}`,
+      message: `Failed to load react-ssg.config.ts: ${message}`,
     }
   }
   finally {

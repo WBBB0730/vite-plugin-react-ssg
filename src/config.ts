@@ -2,20 +2,25 @@ import type { ComponentType } from 'react'
 import type { RouteObject } from 'react-router'
 
 export type HistoryMode = 'browser' | 'hash'
+export type ReactSsgLogLevel = 'silent' | 'normal' | 'verbose'
 
 export interface ReactSsgConfigContext {
   command: 'build'
   mode: string
 }
 
-export interface RouteConfigInput {
+interface SharedConfigInput {
+  logLevel?: ReactSsgLogLevel
+}
+
+export interface RouteConfigInput extends SharedConfigInput {
   history: HistoryMode
   routes: RouteObject[]
   paths?: string[]
   app?: never
 }
 
-export interface AppConfigInput {
+export interface AppConfigInput extends SharedConfigInput {
   app: ComponentType
   history?: never
   routes?: never
