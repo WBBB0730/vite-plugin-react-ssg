@@ -1,0 +1,106 @@
+:root {
+  color: #14213d;
+  background:
+    radial-gradient(circle at top, rgba(255, 196, 61, 0.25), transparent 32%),
+    linear-gradient(180deg, #fff8e8 0%, #f7f0dd 100%);
+  font-family: "Iowan Old Style", "Palatino Linotype", serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+}
+
+code {
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 0.92em;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.shell {
+  width: min(960px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 40px 0 64px;
+}
+
+.hero,
+.panel,
+.app-demo {
+  border: 1px solid rgba(20, 33, 61, 0.12);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 24px 60px rgba(20, 33, 61, 0.1);
+}
+
+.hero {
+  padding: 40px;
+}
+
+.hero h1,
+.panel h2,
+.app-demo h2 {
+  margin: 0 0 16px;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  letter-spacing: -0.04em;
+}
+
+.hero p,
+.panel p,
+.app-demo p {
+  margin: 0;
+  max-width: 60ch;
+}
+
+.eyebrow {
+  display: inline-flex;
+  margin-bottom: 16px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #14213d;
+  color: #fff8e8;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.nav a {
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: #fca311;
+  color: #14213d;
+  text-decoration: none;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-weight: 600;
+}
+
+.panel,
+.app-demo {
+  margin-top: 24px;
+  padding: 28px;
+}
