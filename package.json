@@ -1,7 +1,7 @@
 {
   "name": "vite-plugin-react-ssg",
   "type": "module",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "A build-time prerendering plugin that generates static HTML for traditional Vite React SPAs.",
   "author": "WBBB",
   "license": "MIT",
