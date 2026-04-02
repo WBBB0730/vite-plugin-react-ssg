@@ -2,9 +2,29 @@
 
 面向传统 Vite React SPA 的构建期预渲染插件。
 
+## 特性
+
 - 在 `vite build` 后生成静态 HTML
 - 保留原有 CSR 资源文件，并额外写入预渲染 HTML 文件
 - 支持 React Router v6.4+ data router 和单页模式
+
+## 快速开始
+
+### 安装
+
+```bash
+pnpm add vite-plugin-react-ssg
+```
+
+```bash
+npm install vite-plugin-react-ssg
+```
+
+确保项目中已经使用 `react`、`react-dom` 和 `vite`。
+
+### 使用
+
+先在 `vite.config.ts` 中注册插件。
 
 ```ts
 import react from '@vitejs/plugin-react'
@@ -15,16 +35,6 @@ export default defineConfig({
   plugins: [react(), reactSsg()],
 })
 ```
-
-## 安装
-
-```bash
-pnpm add vite-plugin-react-ssg
-```
-
-确保项目中已经使用 `react`、`react-dom` 和 `vite`。
-
-## 快速开始
 
 在项目根目录创建 `react-ssg.config.ts`。
 
@@ -66,11 +76,11 @@ export default defineReactSsgConfig(({ mode }) => ({
 }))
 ```
 
-## 使用方式
-
 插件会在 `vite build` 完成后读取 `react-ssg.config.ts`，并将配置中的目标预渲染为静态 HTML。
 
-## 配置项
+## API 参考
+
+以下配置项用于 `react-ssg.config.ts` 中的 `defineReactSsgConfig(...)`。
 
 ### `history`
 
@@ -100,14 +110,16 @@ export default defineReactSsgConfig(({ mode }) => ({
 - `normal`：输出开始阶段、警告和完成摘要
 - `verbose`：在完成摘要后追加逐路由结果列表
 
-## 输出行为
+## 注意事项
+
+### 输出行为
 
 - 单页模式会预渲染 `/`
 - 路由模式下，`history: 'hash'` 会预渲染 `/`
 - `/` 会写入 `dist/index.html`
 - 其他路径会写入 `dist/<path>/index.html`
 
-## 回退行为
+### 回退行为
 
 - 如果缺少 `react-ssg.config.ts`，会跳过预渲染并保留普通 CSR 构建结果
 - 如果配置无效或加载失败，会跳过预渲染并保留普通 CSR 构建结果
@@ -119,11 +131,18 @@ export default defineReactSsgConfig(({ mode }) => ({
 - 包含动态参数或 splat 的路径不会被自动发现，需要通过 `paths` 显式补充
 - React Router v5 和 v6.4 之前的声明式路由模式不在支持范围内
 
-## 参与贡献
+## 开发
 
 ```bash
+# 安装项目依赖
 pnpm install
+
+# 执行一次 Vitest 测试套件
 pnpm test -- --run
+
+# 执行 TypeScript 类型检查
 pnpm typecheck
+
+# 构建产物输出
 pnpm build
 ```

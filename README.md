@@ -2,9 +2,29 @@
 
 Build-time prerendering for traditional Vite React SPAs.
 
+## Features
+
 - prerender static HTML after `vite build`
 - keep the original CSR assets while writing prerendered HTML files
 - support React Router v6.4+ data routers and a single-app mode
+
+## Getting started
+
+### Installation
+
+```bash
+pnpm add vite-plugin-react-ssg
+```
+
+```bash
+npm install vite-plugin-react-ssg
+```
+
+Make sure your project already uses `react`, `react-dom`, and `vite`.
+
+### Usage
+
+Register the plugin in `vite.config.ts`.
 
 ```ts
 import react from '@vitejs/plugin-react'
@@ -15,16 +35,6 @@ export default defineConfig({
   plugins: [react(), reactSsg()],
 })
 ```
-
-## Install
-
-```bash
-pnpm add vite-plugin-react-ssg
-```
-
-Make sure your project already uses `react`, `react-dom`, and `vite`.
-
-## Quick Start
 
 Create `react-ssg.config.ts` in your project root.
 
@@ -66,11 +76,11 @@ export default defineReactSsgConfig(({ mode }) => ({
 }))
 ```
 
-## Usage
-
 The plugin reads `react-ssg.config.ts` after `vite build` finishes and prerenders the configured targets into static HTML.
 
-## Options
+## API Reference
+
+These options are passed to `defineReactSsgConfig(...)` in `react-ssg.config.ts`.
 
 ### `history`
 
@@ -100,14 +110,16 @@ Controls prerender logs. Defaults to `normal`.
 - `normal`: print the start phase, warnings, and a completed summary
 - `verbose`: add a per-route result list after the completed summary
 
-## Output
+## Notes
+
+### Output
 
 - App mode prerenders `/`
 - Route mode with `history: 'hash'` prerenders `/`
 - `/` is written to `dist/index.html`
 - Other paths are written to `dist/<path>/index.html`
 
-## Fallbacks
+### Fallbacks
 
 - Missing `react-ssg.config.ts` skips prerendering and keeps the normal CSR build output
 - Invalid or unloadable config skips prerendering and keeps the normal CSR build output
@@ -119,11 +131,18 @@ Controls prerender logs. Defaults to `normal`.
 - Dynamic parameter routes and splat routes must be provided explicitly through `paths`
 - React Router v5 and pre-v6.4 declarative router setups are out of scope
 
-## Contributing
+## Development
 
 ```bash
+# Install project dependencies
 pnpm install
+
+# Run the Vitest test suite once
 pnpm test -- --run
+
+# Run TypeScript type checking
 pnpm typecheck
+
+# Build the package output
 pnpm build
 ```
