@@ -1,0 +1,53 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve release plan
+        id: release_plan
+        run: pnpm run prepare-release
+
+      - name: Run unit tests
+        run: pnpm test -- --run
+
+      - name: Run type check
+        run: pnpm typecheck
+
+      - name: Build package
+        run: pnpm build
+
+      - name: Publish to npm
+        run: |
+          if [ -n "${{ steps.release_plan.outputs.publish_args }}" ]; then
+            npm publish ${{ steps.release_plan.outputs.publish_args }}
+          else
+            npm publish
+          fi

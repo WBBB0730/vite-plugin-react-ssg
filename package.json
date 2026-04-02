@@ -5,6 +5,10 @@
   "description": "A build-time prerendering plugin that generates static HTML for traditional Vite React SPAs.",
   "author": "WBBB",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/WBBB0730/vite-plugin-react-ssg.git"
+  },
   "exports": {
     ".": "./dist/index.mjs",
     "./config": "./dist/config.mjs",
@@ -22,6 +26,7 @@
     "play": "vite",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
+    "prepare-release": "node ./scripts/prepare-npm-release.mjs",
     "release": "bumpp",
     "prepublishOnly": "pnpm run build"
   },
