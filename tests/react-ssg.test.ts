@@ -1,9 +1,12 @@
+import { execFile } from 'node:child_process'
 import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { promisify } from 'node:util'
 import { build } from 'vite'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 
+const execFileAsync = promisify(execFile)
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const tempRoot = path.join(repoRoot, '.tmp-tests')
 const pluginEntryUrl = pathToFileURL(path.join(repoRoot, 'src/index.ts')).href
@@ -83,6 +86,27 @@ async function buildProject(root: string): Promise<void> {
   })
 }
 
+async function buildPackageDist(): Promise<void> {
+  await execFileAsync('pnpm', ['build'], {
+    cwd: repoRoot,
+  })
+}
+
+function resolvePlaygroundAppRoot(appName: string): string {
+  return path.join(repoRoot, 'playgrounds', appName)
+}
+
+function resolvePlaygroundDistRoot(appName: string): string {
+  return path.join(resolvePlaygroundAppRoot(appName), 'dist')
+}
+
+async function buildPlayground(appName: string): Promise<void> {
+  await build({
+    configFile: path.join(resolvePlaygroundAppRoot(appName), 'vite.config.ts'),
+    logLevel: 'silent',
+  })
+}
+
 function collectMessages(spy: ReturnType<typeof vi.spyOn>): string[] {
   return spy.mock.calls.flatMap(call =>
     call.map(value => String(value)),
@@ -133,6 +157,9 @@ function createDataRouterModeFiles(options: {
 
 afterEach(async () => {
   await rm(tempRoot, { recursive: true, force: true })
+  await rm(resolvePlaygroundDistRoot('routes-browser'), { recursive: true, force: true })
+  await rm(resolvePlaygroundDistRoot('app-basic'), { recursive: true, force: true })
+  await rm(resolvePlaygroundDistRoot('routes-hash'), { recursive: true, force: true })
   vi.restoreAllMocks()
 })
 
@@ -499,5 +526,41 @@ describe('vite-plugin-react-ssg', () => {
     expectMessages(warn, [
       '⚠ Failed to prerender /boom. Falling back to CSR for this route. Reason: boom',
     ])
+  }, 10000)
+
+  test('routes-browser playground app 可以连接本地 dist 包产物并完成真实预渲染构建', async () => {
+    await buildPackageDist()
+    await buildPlayground('routes-browser')
+
+    const playgroundDistRoot = resolvePlaygroundDistRoot('routes-browser')
+    const indexHtml = await readFile(path.join(playgroundDistRoot, 'index.html'), 'utf8')
+    const guideHtml = await readFile(path.join(playgroundDistRoot, 'guide', 'index.html'), 'utf8')
+    const postHtml = await readFile(path.join(playgroundDistRoot, 'posts', 'hello-world', 'index.html'), 'utf8')
+
+    expect(indexHtml).toContain('自动发现静态路由')
+    expect(guideHtml).toContain('动态路径由 paths 补充')
+    expect(postHtml).toContain('hello-world')
+  })
+
+  test('app-basic playground app 可以连接本地 dist 包产物并完成单页预渲染构建', async () => {
+    await buildPackageDist()
+    await buildPlayground('app-basic')
+
+    const playgroundDistRoot = resolvePlaygroundDistRoot('app-basic')
+    const indexHtml = await readFile(path.join(playgroundDistRoot, 'index.html'), 'utf8')
+
+    expect(indexHtml).toContain('单页模式示例')
+    expect(indexHtml).toContain('defineReactSsgConfig')
+  })
+
+  test('routes-hash playground app 可以连接本地 dist 包产物并只生成默认首屏 HTML', async () => {
+    await buildPackageDist()
+    await buildPlayground('routes-hash')
+
+    const playgroundDistRoot = resolvePlaygroundDistRoot('routes-hash')
+    const indexHtml = await readFile(path.join(playgroundDistRoot, 'index.html'), 'utf8')
+
+    expect(indexHtml).toContain('Hash 首页')
+    expect(await stat(path.join(playgroundDistRoot, 'guide', 'index.html')).then(() => true).catch(() => false)).toBe(false)
   })
 })

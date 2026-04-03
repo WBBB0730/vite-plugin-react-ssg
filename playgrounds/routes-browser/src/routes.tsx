@@ -64,7 +64,7 @@ function PostPage() {
       <p>
         当前 slug：
         {' '}
-        <strong>{params.slug}</strong>
+        <strong>{params['slug']}</strong>
       </p>
     </section>
   )

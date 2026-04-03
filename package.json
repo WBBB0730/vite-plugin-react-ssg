@@ -23,9 +23,9 @@
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
-    "play": "vite",
+    "play": "tsx ./scripts/play.ts",
     "test": "vitest",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit --project playgrounds/tsconfig.json && tsc --noEmit --project scripts/tsconfig.json",
     "prepare-release": "node ./scripts/prepare-npm-release.mjs",
     "release": "bumpp",
     "prepublishOnly": "pnpm run build"
@@ -46,6 +46,7 @@
     "bumpp": "^11.0.1",
     "react-router": "^7.13.2",
     "tsdown": "^0.21.7",
+    "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.3",
     "vitest": "^4.1.2"

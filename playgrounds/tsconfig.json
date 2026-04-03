@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node", "vite/client"]
+  },
+  "include": [
+    "./_shared/**/*.ts",
+    "./*/vite.config.ts",
+    "./*/react-ssg.config.ts",
+    "./*/src/**/*"
+  ]
+}
