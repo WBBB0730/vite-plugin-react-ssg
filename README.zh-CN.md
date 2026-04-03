@@ -13,14 +13,14 @@
 ### 安装
 
 ```bash
-pnpm add vite-plugin-react-ssg
+pnpm add vite-plugin-react-ssg @unhead/react
 ```
 
 ```bash
-npm install vite-plugin-react-ssg
+npm install vite-plugin-react-ssg @unhead/react
 ```
 
-确保项目中已经使用 `react`、`react-dom` 和 `vite`。
+确保项目中已经使用 `react@>=18.3.1`、`react-dom@>=18.3.1` 和 `vite`。
 
 ### 使用
 
@@ -77,6 +77,54 @@ export default defineReactSsgConfig(({ mode }) => ({
 ```
 
 插件会在 `vite build` 完成后读取 `react-ssg.config.ts`，并将配置中的目标预渲染为静态 HTML。
+
+### 页面级 head 管理
+
+如果你希望为页面或布局声明标题、TDK、Open Graph 等信息，请直接使用官方 `@unhead/react` API。
+
+先在客户端入口初始化 `UnheadProvider`：
+
+```tsx
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import { createHead, UnheadProvider } from '@unhead/react/client'
+import { createBrowserRouter, RouterProvider } from 'react-router'
+import { routes } from './routes'
+
+const head = createHead()
+const router = createBrowserRouter(routes)
+
+createRoot(document.querySelector('#app')!).render(
+  <StrictMode>
+    <UnheadProvider head={head}>
+      <RouterProvider router={router} />
+    </UnheadProvider>
+  </StrictMode>,
+)
+```
+
+然后在页面或布局组件里使用官方 Hook：
+
+```tsx
+import { useHead, useSeoMeta } from '@unhead/react'
+
+export function PostPage() {
+  useSeoMeta({
+    title: '文章标题',
+    description: '文章摘要',
+  })
+
+  useHead({
+    meta: [
+      { property: 'og:image', content: 'https://example.com/post-cover.png' },
+    ],
+  })
+
+  return <main>...</main>
+}
+```
+
+预渲染阶段会先把应用 HTML 注入 `index.html`，再把完整模板交给 Unhead 的 `transformHtmlTemplate()` 处理。插件不会在 Unhead 之上额外添加自定义的 head 合并规则。
 
 ## API 参考
 

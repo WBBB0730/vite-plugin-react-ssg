@@ -13,8 +13,9 @@ describe('package metadata', () => {
     }
 
     expect(packageJson.peerDependencies).toMatchObject({
-      react: '>=16.8',
-      'react-dom': '>=16.8',
+      '@unhead/react': '*',
+      react: '>=18.3.1',
+      'react-dom': '>=18.3.1',
       'react-router': '^6.4.0 || ^7.0.0',
     })
   })

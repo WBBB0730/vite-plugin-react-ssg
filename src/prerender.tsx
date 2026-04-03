@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { createElement } from 'react'
 import { renderToString } from 'react-dom/server'
+import { UnheadProvider, createHead, transformHtmlTemplate } from '@unhead/react/server'
 import {
   createMemoryRouter,
   RouterProvider,
@@ -27,16 +28,32 @@ function createRouteElement(routes: RouteObject[], targetPath: string) {
   return createElement(RouterProvider, { router })
 }
 
-function renderAppHtml(config: ResolvedReactSsgConfig, targetPath: string): string {
+function createAppElement(config: ResolvedReactSsgConfig, targetPath: string) {
   if (config.mode === 'app') {
-    return renderToString(createElement(config.app))
+    return createElement(config.app)
   }
 
-  return renderToString(createRouteElement(config.routes, targetPath))
+  return createRouteElement(config.routes, targetPath)
 }
 
 function injectAppHtml(template: string, appHtml: string): string {
   return template.replace('<div id="app"></div>', `<div id="app">${appHtml}</div>`)
+}
+
+async function renderPageHtml(
+  template: string,
+  config: ResolvedReactSsgConfig,
+  targetPath: string,
+): Promise<string> {
+  const head = createHead()
+  const appHtml = renderToString(
+    createElement(UnheadProvider, {
+      value: head,
+      children: createAppElement(config, targetPath),
+    }),
+  )
+
+  return transformHtmlTemplate(head, injectAppHtml(template, appHtml))
 }
 
 function resolveTargetPaths(config: ResolvedReactSsgConfig): string[] {
@@ -81,7 +98,7 @@ export async function prerenderBuild(options: {
 
   for (const targetPath of targetPaths) {
     try {
-      const html = injectAppHtml(template, renderAppHtml(options.config, targetPath))
+      const html = await renderPageHtml(template, options.config, targetPath)
       const outputPath = getOutputFilePath(options.outDir, targetPath)
 
       await mkdir(path.dirname(outputPath), { recursive: true })

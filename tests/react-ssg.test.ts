@@ -155,6 +155,45 @@ function createDataRouterModeFiles(options: {
   }
 }
 
+function createUnheadDataRouterModeFiles(options: {
+  history: 'browser' | 'hash'
+  configBody: string
+  routesBody: string
+}): Record<string, string> {
+  const routerFactory =
+    options.history === 'browser' ? 'createBrowserRouter' : 'createHashRouter'
+
+  return {
+    'src/main.tsx': [
+      "import { StrictMode } from 'react'",
+      "import { createRoot } from 'react-dom/client'",
+      "import { createHead, UnheadProvider } from '@unhead/react/client'",
+      `import { ${routerFactory}, RouterProvider } from 'react-router'`,
+      "import { routes } from './routes'",
+      '',
+      'const head = createHead()',
+      `const router = ${routerFactory}(routes)`,
+      '',
+      "createRoot(document.querySelector('#app')!).render(",
+      '  <StrictMode>',
+      '    <UnheadProvider head={head}>',
+      '      <RouterProvider router={router} />',
+      '    </UnheadProvider>',
+      '  </StrictMode>,',
+      ')',
+      '',
+    ].join('\n'),
+    'src/routes.tsx': options.routesBody,
+    'react-ssg.config.ts': [
+      `import { defineReactSsgConfig } from ${JSON.stringify(configEntryUrl)}`,
+      "import { routes } from './src/routes'",
+      '',
+      options.configBody,
+      '',
+    ].join('\n'),
+  }
+}
+
 afterEach(async () => {
   await rm(tempRoot, { recursive: true, force: true })
   await rm(resolvePlaygroundDistRoot('routes-browser'), { recursive: true, force: true })
@@ -375,6 +414,261 @@ describe('vite-plugin-react-ssg', () => {
     expect(await project.readDistFile('index.html')).toContain('单页预渲染')
   })
 
+  test('页面级 useHead 和 useSeoMeta 会通过 transformHtmlTemplate 参与最终 head 输出', async () => {
+    const project = await createProject({
+      'index.html': [
+        '<!doctype html>',
+        '<html lang="zh-CN">',
+        '  <head>',
+        '    <meta charset="UTF-8" />',
+        '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+        '    <meta name="description" content="模板描述" />',
+        '    <meta property="og:image:alt" content="模板图片替代文本" />',
+        '    <title>模板标题</title>',
+        '  </head>',
+        '  <body>',
+        '    <div id="app"></div>',
+        '    <script type="module" src="/src/main.tsx"></script>',
+        '  </body>',
+        '</html>',
+      ].join('\n'),
+      ...createUnheadDataRouterModeFiles({
+        history: 'browser',
+        configBody: [
+          'export default defineReactSsgConfig({',
+          "  history: 'browser',",
+          '  routes,',
+          '})',
+        ].join('\n'),
+        routesBody: [
+          "import { Outlet } from 'react-router'",
+          "import { useHead, useSeoMeta } from '@unhead/react'",
+          '',
+          'function Layout() {',
+          '  return <main><Outlet /></main>',
+          '}',
+          '',
+          'function HomePage() {',
+          '  useSeoMeta({',
+          "    title: '首页标题',",
+          "    description: '首页描述',",
+          "    ogTitle: '首页 Open Graph 标题',",
+          '  })',
+          '  useHead({',
+          '    meta: [',
+          "      { property: 'og:image', content: 'https://example.com/cover-home.png' },",
+          "      { name: 'robots', content: 'index,follow' },",
+          '    ],',
+          '  })',
+          "  return <p>带 head 的首页</p>",
+          '}',
+          '',
+          'function AboutPage() {',
+          "  return <p>没有页面级 head 的关于页</p>",
+          '}',
+          '',
+          'export const routes = [',
+          '  {',
+          "    path: '/',",
+          '    Component: Layout,',
+          '    children: [',
+          '      { index: true, Component: HomePage },',
+          "      { path: 'about', Component: AboutPage },",
+          '    ],',
+          '  },',
+          ']',
+          '',
+        ].join('\n'),
+      }),
+    })
+
+    await buildProject(project.root)
+
+    const homeHtml = await project.readDistFile('index.html')
+    const aboutHtml = await project.readDistFile('about/index.html')
+
+    expect(homeHtml).toContain('<title>首页标题</title>')
+    expect(homeHtml).toContain('content="模板描述"')
+    expect(homeHtml).toContain('property="og:image" content="https://example.com/cover-home.png"')
+    expect(homeHtml).toContain('property="og:image:alt" content="模板图片替代文本"')
+    expect(homeHtml).toContain('name="robots" content="index,follow"')
+    expect(homeHtml).toContain('带 head 的首页')
+
+    expect(aboutHtml).toContain('<title>模板标题</title>')
+    expect(aboutHtml).toContain('content="模板描述"')
+    expect(aboutHtml).toContain('没有页面级 head 的关于页')
+  })
+
+  test('单页模式下 useSeoMeta 和 useHead 也会参与最终 head 输出', async () => {
+    const project = await createProject({
+      'index.html': [
+        '<!doctype html>',
+        '<html lang="zh-CN">',
+        '  <head>',
+        '    <meta charset="UTF-8" />',
+        '    <meta name="viewport" content="width=device-width, initial-scale=1.0" />',
+        '    <meta name="description" content="单页模板描述" />',
+        '    <title>单页模板标题</title>',
+        '  </head>',
+        '  <body>',
+        '    <div id="app"></div>',
+        '    <script type="module" src="/src/main.tsx"></script>',
+        '  </body>',
+        '</html>',
+      ].join('\n'),
+      'src/App.tsx': [
+        "import { useHead, useSeoMeta } from '@unhead/react'",
+        '',
+        'export function App() {',
+        '  useSeoMeta({',
+        "    title: '单页标题',",
+        '  })',
+        '  useHead({',
+        '    link: [',
+        "      { rel: 'canonical', href: 'https://example.com/app' },",
+        '    ],',
+        '  })',
+        "  return <h1>单页 Head 示例</h1>",
+        '}',
+        '',
+      ].join('\n'),
+      'src/main.tsx': [
+        "import { StrictMode } from 'react'",
+        "import { createRoot } from 'react-dom/client'",
+        "import { createHead, UnheadProvider } from '@unhead/react/client'",
+        "import { App } from './App'",
+        '',
+        'const head = createHead()',
+        '',
+        "createRoot(document.querySelector('#app')!).render(",
+        '  <StrictMode>',
+        '    <UnheadProvider head={head}>',
+        '      <App />',
+        '    </UnheadProvider>',
+        '  </StrictMode>,',
+        ')',
+        '',
+      ].join('\n'),
+      'react-ssg.config.ts': [
+        `import { defineReactSsgConfig } from ${JSON.stringify(configEntryUrl)}`,
+        "import { App } from './src/App'",
+        '',
+        'export default defineReactSsgConfig({',
+        '  app: App,',
+        '})',
+        '',
+      ].join('\n'),
+    })
+
+    await buildProject(project.root)
+
+    const html = await project.readDistFile('index.html')
+
+    expect(html).toContain('<title>单页标题</title>')
+    expect(html).toContain('rel="canonical" href="https://example.com/app"')
+    expect(html).toContain('content="单页模板描述"')
+    expect(html).toContain('单页 Head 示例')
+  })
+
+  test('hash 路由模式下首屏页面的 head 会参与根路径输出', async () => {
+    const project = await createProject(
+      createUnheadDataRouterModeFiles({
+        history: 'hash',
+        configBody: [
+          'export default defineReactSsgConfig({',
+          "  history: 'hash',",
+          '  routes,',
+          '})',
+        ].join('\n'),
+        routesBody: [
+          "import { Outlet } from 'react-router'",
+          "import { useSeoMeta } from '@unhead/react'",
+          '',
+          'function Layout() {',
+          '  return <main><Outlet /></main>',
+          '}',
+          '',
+          'function HomePage() {',
+          '  useSeoMeta({',
+          "    title: 'Hash 首屏标题',",
+          '  })',
+          "  return <p>Hash Head 首页</p>",
+          '}',
+          '',
+          'function GuidePage() {',
+          '  useSeoMeta({',
+          "    title: 'Hash 子路由标题',",
+          '  })',
+          "  return <p>Hash 子路由</p>",
+          '}',
+          '',
+          'export const routes = [',
+          '  {',
+          "    path: '/',",
+          '    Component: Layout,',
+          '    children: [',
+          '      { index: true, Component: HomePage },',
+          "      { path: 'guide', Component: GuidePage },",
+          '    ],',
+          '  },',
+          ']',
+          '',
+        ].join('\n'),
+      }),
+    )
+
+    await buildProject(project.root)
+
+    const html = await project.readDistFile('index.html')
+
+    expect(html).toContain('<title>Hash 首屏标题</title>')
+    expect(html).toContain('Hash Head 首页')
+    expect(await project.hasDistFile('guide/index.html')).toBe(false)
+  })
+
+  test('同一页面中的多条同名 meta 会按 Unhead 结果一起输出', async () => {
+    const project = await createProject(
+      createUnheadDataRouterModeFiles({
+        history: 'browser',
+        configBody: [
+          'export default defineReactSsgConfig({',
+          "  history: 'browser',",
+          '  routes,',
+          '})',
+        ].join('\n'),
+        routesBody: [
+          "import { useHead } from '@unhead/react'",
+          '',
+          'function HomePage() {',
+          '  useHead({',
+          '    meta: [',
+          "      { name: 'google-site-verification', content: 'verify-a' },",
+          "      { name: 'google-site-verification', content: 'verify-b' },",
+          '    ],',
+          '  })',
+          "  return <p>验证标签首页</p>",
+          '}',
+          '',
+          'export const routes = [',
+          '  {',
+          "    path: '/',",
+          '    Component: HomePage,',
+          '  },',
+          ']',
+          '',
+        ].join('\n'),
+      }),
+    )
+
+    await buildProject(project.root)
+
+    const html = await project.readDistFile('index.html')
+
+    expect(html).toContain('name="google-site-verification" content="verify-a"')
+    expect(html).toContain('name="google-site-verification" content="verify-b"')
+    expect(html).toContain('验证标签首页')
+  })
+
   test('silent 模式会抑制常规构建日志', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -538,8 +832,12 @@ describe('vite-plugin-react-ssg', () => {
     const postHtml = await readFile(path.join(playgroundDistRoot, 'posts', 'hello-world', 'index.html'), 'utf8')
 
     expect(indexHtml).toContain('自动发现静态路由')
+    expect(indexHtml).toContain('<title>Routes Browser - 首页</title>')
+    expect(indexHtml).toContain('name="robots" content="index,follow"')
     expect(guideHtml).toContain('动态路径由 paths 补充')
+    expect(guideHtml).toContain('content="Routes Browser 默认模板描述"')
     expect(postHtml).toContain('hello-world')
+    expect(postHtml).toContain('property="og:image" content="https://example.com/og/hello-world.png"')
   })
 
   test('app-basic playground app 可以连接本地 dist 包产物并完成单页预渲染构建', async () => {
@@ -551,6 +849,7 @@ describe('vite-plugin-react-ssg', () => {
 
     expect(indexHtml).toContain('单页模式示例')
     expect(indexHtml).toContain('defineReactSsgConfig')
+    expect(indexHtml).toContain('<title>App Basic - 单页模式示例</title>')
   })
 
   test('routes-hash playground app 可以连接本地 dist 包产物并只生成默认首屏 HTML', async () => {

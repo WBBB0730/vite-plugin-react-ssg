@@ -1,4 +1,11 @@
+import { useSeoMeta } from '@unhead/react'
+
 export function App() {
+  useSeoMeta({
+    title: 'App Basic - 单页模式示例',
+    description: '这个示例展示单页模式下与 @unhead/react 配合的页面级 head 声明。',
+  })
+
   return (
     <section className="app-demo">
       <span className="eyebrow">App Mode</span>

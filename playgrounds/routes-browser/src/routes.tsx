@@ -1,6 +1,13 @@
 import { Link, Outlet, useParams } from 'react-router'
+import { useHead, useSeoMeta } from '@unhead/react'
 
 function Shell() {
+  useHead({
+    meta: [
+      { name: 'robots', content: 'index,follow' },
+    ],
+  })
+
   return (
     <div className="shell">
       <header className="hero">
@@ -25,6 +32,10 @@ function Shell() {
 }
 
 function HomePage() {
+  useSeoMeta({
+    title: 'Routes Browser - 首页',
+  })
+
   return (
     <section className="panel">
       <h2>自动发现静态路由</h2>
@@ -34,6 +45,11 @@ function HomePage() {
 }
 
 function GuidePage() {
+  useSeoMeta({
+    title: 'Routes Browser - 接入说明',
+    description: '这个页面演示模板 head 与页面级 useSeoMeta 共同参与最终输出。',
+  })
+
   return (
     <section className="panel">
       <h2>动态路径由 paths 补充</h2>
@@ -57,6 +73,16 @@ function GuidePage() {
 
 function PostPage() {
   const params = useParams()
+
+  useHead({
+    title: `Routes Browser - ${params['slug']}`,
+    meta: [
+      {
+        property: 'og:image',
+        content: `https://example.com/og/${params['slug']}.png`,
+      },
+    ],
+  })
 
   return (
     <section className="panel">

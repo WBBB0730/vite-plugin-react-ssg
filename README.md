@@ -13,14 +13,14 @@ Build-time prerendering for traditional Vite React SPAs.
 ### Installation
 
 ```bash
-pnpm add vite-plugin-react-ssg
+pnpm add vite-plugin-react-ssg @unhead/react
 ```
 
 ```bash
-npm install vite-plugin-react-ssg
+npm install vite-plugin-react-ssg @unhead/react
 ```
 
-Make sure your project already uses `react`, `react-dom`, and `vite`.
+Make sure your project already uses `react@>=18.3.1`, `react-dom@>=18.3.1`, and `vite`.
 
 ### Usage
 
@@ -77,6 +77,54 @@ export default defineReactSsgConfig(({ mode }) => ({
 ```
 
 The plugin reads `react-ssg.config.ts` after `vite build` finishes and prerenders the configured targets into static HTML.
+
+### Page-level head management
+
+Use the official `@unhead/react` APIs if you want page-specific titles, meta tags, and social tags.
+
+Initialize `UnheadProvider` in your client entry:
+
+```tsx
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import { createHead, UnheadProvider } from '@unhead/react/client'
+import { createBrowserRouter, RouterProvider } from 'react-router'
+import { routes } from './routes'
+
+const head = createHead()
+const router = createBrowserRouter(routes)
+
+createRoot(document.querySelector('#app')!).render(
+  <StrictMode>
+    <UnheadProvider head={head}>
+      <RouterProvider router={router} />
+    </UnheadProvider>
+  </StrictMode>,
+)
+```
+
+Then declare head tags in pages or layouts:
+
+```tsx
+import { useHead, useSeoMeta } from '@unhead/react'
+
+export function PostPage() {
+  useSeoMeta({
+    title: 'Post title',
+    description: 'Post summary',
+  })
+
+  useHead({
+    meta: [
+      { property: 'og:image', content: 'https://example.com/post-cover.png' },
+    ],
+  })
+
+  return <main>...</main>
+}
+```
+
+The prerender pipeline injects your app HTML into `index.html` and then delegates the final template/head merge to Unhead's `transformHtmlTemplate()`. The plugin does not add custom head merge rules on top of Unhead.
 
 ## API Reference
 
