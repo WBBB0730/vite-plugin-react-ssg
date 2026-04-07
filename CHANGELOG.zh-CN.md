@@ -2,6 +2,21 @@
 
 本文件记录了该项目的所有重要变更。
 
+## [0.2.0]
+
+### 新增
+
+- 新增路由模式下对匹配到的 React Router `loader` 的构建期执行能力，并把可复用的 hydration data 序列化注入到预渲染 HTML 中，供客户端复用。
+- 新增路由模式 `origin` 配置项，用于控制传给构建期 React Router loader 请求的绝对源地址。
+
+### 变更
+
+- 更新 README 和 `routes-browser` playground，补充 loader 驱动的预渲染与 hydration 接入示例。
+
+### 修复
+
+- 当 React Router 静态查询返回 redirect 一类 `Response` 时，插件现在只跳过当前受影响路径，并继续预渲染其余目标。
+
 ## [0.1.0]
 
 ### 新增
