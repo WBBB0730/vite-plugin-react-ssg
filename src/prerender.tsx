@@ -4,56 +4,96 @@ import { createElement } from 'react'
 import { renderToString } from 'react-dom/server'
 import { UnheadProvider, createHead, transformHtmlTemplate } from '@unhead/react/server'
 import {
-  createMemoryRouter,
-  RouterProvider,
-  type RouteObject,
+  createStaticHandler,
+  createStaticRouter,
+  StaticRouterProvider,
+  type StaticHandlerContext,
 } from 'react-router'
-import type { ResolvedReactSsgConfig } from './load-config'
+import type { ResolvedReactSsgConfig, ResolvedRouteConfig } from './load-config'
 import type {
   PrerenderRouteResult,
   PrerenderSummary,
 } from './logger'
 import { discoverStaticPaths } from './route-paths'
+import { createStaticRouterHydrationScript } from './vendor/react-router/static-hydration'
 
 export interface PrerenderWarning {
   targetPath: string
   error: unknown
 }
 
-function createRouteElement(routes: RouteObject[], targetPath: string) {
-  const router = createMemoryRouter(routes, {
-    initialEntries: [targetPath],
-  })
+const DEFAULT_PRERENDER_ORIGIN = 'http://localhost'
 
-  return createElement(RouterProvider, { router })
-}
-
-function createAppElement(config: ResolvedReactSsgConfig, targetPath: string) {
-  if (config.mode === 'app') {
-    return createElement(config.app)
+class StaticQueryResponseError extends Error {
+  constructor(status: number) {
+    super(`Received a Response with status ${status} during static query.`)
+    this.name = 'StaticQueryResponseError'
   }
-
-  return createRouteElement(config.routes, targetPath)
 }
 
 function injectAppHtml(template: string, appHtml: string): string {
   return template.replace('<div id="app"></div>', `<div id="app">${appHtml}</div>`)
 }
 
-async function renderPageHtml(
+function injectBodyScript(template: string, script: string): string {
+  return template.replace('</body>', `<script>${script}</script></body>`)
+}
+
+function createRouteRequest(config: ResolvedRouteConfig, targetPath: string): Request {
+  const url = new URL(targetPath, config.origin ?? DEFAULT_PRERENDER_ORIGIN)
+
+  return new Request(url)
+}
+
+async function renderAppPageHtml(
   template: string,
-  config: ResolvedReactSsgConfig,
-  targetPath: string,
+  app: ResolvedReactSsgConfig & { mode: 'app' },
 ): Promise<string> {
   const head = createHead()
   const appHtml = renderToString(
     createElement(UnheadProvider, {
       value: head,
-      children: createAppElement(config, targetPath),
+      children: createElement(app.app),
     }),
   )
 
   return transformHtmlTemplate(head, injectAppHtml(template, appHtml))
+}
+
+async function renderRoutePageHtml(
+  template: string,
+  config: ResolvedRouteConfig,
+  targetPath: string,
+): Promise<string> {
+  const { query, dataRoutes } = createStaticHandler(config.routes)
+  const queried = await query(createRouteRequest(config, targetPath))
+
+  if (queried instanceof Response) {
+    throw new StaticQueryResponseError(queried.status)
+  }
+
+  const context = queried as StaticHandlerContext
+  const router = createStaticRouter(dataRoutes, context)
+  const head = createHead()
+  const appHtml = renderToString(
+    createElement(UnheadProvider, {
+      value: head,
+      children: createElement(StaticRouterProvider, {
+        router,
+        context,
+        hydrate: false,
+      }),
+    }),
+  )
+  const transformedHtml = await transformHtmlTemplate(
+    head,
+    injectAppHtml(template, appHtml),
+  )
+
+  return injectBodyScript(
+    transformedHtml,
+    createStaticRouterHydrationScript(context),
+  )
 }
 
 function resolveTargetPaths(config: ResolvedReactSsgConfig): string[] {
@@ -98,7 +138,9 @@ export async function prerenderBuild(options: {
 
   for (const targetPath of targetPaths) {
     try {
-      const html = await renderPageHtml(template, options.config, targetPath)
+      const html = options.config.mode === 'app'
+        ? await renderAppPageHtml(template, options.config)
+        : await renderRoutePageHtml(template, options.config, targetPath)
       const outputPath = getOutputFilePath(options.outDir, targetPath)
 
       await mkdir(path.dirname(outputPath), { recursive: true })

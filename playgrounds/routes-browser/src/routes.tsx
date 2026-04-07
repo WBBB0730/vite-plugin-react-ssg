@@ -1,4 +1,4 @@
-import { Link, Outlet, useParams } from 'react-router'
+import { Link, Outlet, useLoaderData, type LoaderFunctionArgs } from 'react-router'
 import { useHead, useSeoMeta } from '@unhead/react'
 
 function Shell() {
@@ -18,6 +18,10 @@ function Shell() {
           {' '}
           <code>routes</code>
           {' '}
+          和
+          {' '}
+          <code>loader</code>
+          {' '}
           配置来模拟插件的预渲染输入。
         </p>
         <nav className="nav">
@@ -31,7 +35,19 @@ function Shell() {
   )
 }
 
+async function loadHomePageData() {
+  return {
+    source: '来自 loader 的首页内容',
+    summary: '在 browser history 下，插件会自动收集静态 path 与 index 路由。',
+  }
+}
+
 function HomePage() {
+  const data = useLoaderData() as {
+    source: string
+    summary: string
+  }
+
   useSeoMeta({
     title: 'Routes Browser - 首页',
   })
@@ -39,12 +55,27 @@ function HomePage() {
   return (
     <section className="panel">
       <h2>自动发现静态路由</h2>
-      <p>在 browser history 下，插件会自动收集静态 path 与 index 路由。</p>
+      <p>{data.summary}</p>
+      <p>{data.source}</p>
     </section>
   )
 }
 
+async function loadGuidePageData({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url)
+
+  return {
+    origin: url.origin,
+    pathname: url.pathname,
+  }
+}
+
 function GuidePage() {
+  const data = useLoaderData() as {
+    origin: string
+    pathname: string
+  }
+
   useSeoMeta({
     title: 'Routes Browser - 接入说明',
     description: '这个页面演示模板 head 与页面级 useSeoMeta 共同参与最终输出。',
@@ -52,34 +83,51 @@ function GuidePage() {
 
   return (
     <section className="panel">
-      <h2>动态路径由 paths 补充</h2>
+      <h2>构建期执行 loader</h2>
       <p>
-        对于
+        当前页面在预渲染前已经执行
         {' '}
-        <code>/posts/:slug</code>
+        <code>loader</code>
+        ，因此静态 HTML 中会直接包含下面这些值。
+      </p>
+      <p>
+        请求源：
         {' '}
-        这样的动态路由，需要在
+        <strong>{data.origin}</strong>
+      </p>
+      <p>
+        请求路径：
         {' '}
-        <code>react-ssg.config.ts</code>
-        {' '}
-        中显式提供
-        {' '}
-        <code>paths</code>
-        。
+        <code>{data.pathname}</code>
       </p>
     </section>
   )
 }
 
+async function loadPostPageData({ params, request }: LoaderFunctionArgs) {
+  const slug = params['slug'] ?? 'unknown'
+  const origin = new URL(request.url).origin
+
+  return {
+    slug,
+    origin,
+    ogImage: `https://example.com/og/${slug}.png`,
+  }
+}
+
 function PostPage() {
-  const params = useParams()
+  const data = useLoaderData() as {
+    slug: string
+    origin: string
+    ogImage: string
+  }
 
   useHead({
-    title: `Routes Browser - ${params['slug']}`,
+    title: `Routes Browser - ${data.slug}`,
     meta: [
       {
         property: 'og:image',
-        content: `https://example.com/og/${params['slug']}.png`,
+        content: data.ogImage,
       },
     ],
   })
@@ -90,7 +138,12 @@ function PostPage() {
       <p>
         当前 slug：
         {' '}
-        <strong>{params['slug']}</strong>
+        <strong>{data.slug}</strong>
+      </p>
+      <p>
+        构建期请求源：
+        {' '}
+        <code>{data.origin}</code>
       </p>
     </section>
   )
@@ -101,9 +154,9 @@ export const routes = [
     path: '/',
     Component: Shell,
     children: [
-      { index: true, Component: HomePage },
-      { path: 'guide', Component: GuidePage },
-      { path: 'posts/:slug', Component: PostPage },
+      { index: true, loader: loadHomePageData, Component: HomePage },
+      { path: 'guide', loader: loadGuidePageData, Component: GuidePage },
+      { path: 'posts/:slug', loader: loadPostPageData, Component: PostPage },
     ],
   },
 ]

@@ -16,6 +16,7 @@ interface SharedConfigInput {
 export interface RouteConfigInput extends SharedConfigInput {
   history: HistoryMode
   routes: RouteObject[]
+  origin?: string
   paths?: string[]
   app?: never
 }

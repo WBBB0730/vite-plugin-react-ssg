@@ -1,14 +1,19 @@
 import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
+import { hydrateRoot } from 'react-dom/client'
 import { createHead, UnheadProvider } from '@unhead/react/client'
-import { createBrowserRouter, RouterProvider } from 'react-router'
+import { createBrowserRouter, RouterProvider, type HydrationState } from 'react-router'
 import { routes } from './routes'
 import '../../_shared/style.css'
 
 const head = createHead()
-const router = createBrowserRouter(routes)
+const hydrationData = (window as Window & {
+  __staticRouterHydrationData?: HydrationState
+}).__staticRouterHydrationData
+const router = createBrowserRouter(routes, {
+  ...(hydrationData ? { hydrationData } : {}),
+})
 
-createRoot(document.querySelector('#app')!).render(
+hydrateRoot(document.querySelector('#app')!,
   <StrictMode>
     <UnheadProvider head={head}>
       <RouterProvider router={router} />

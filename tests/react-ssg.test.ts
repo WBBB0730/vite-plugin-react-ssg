@@ -194,6 +194,43 @@ function createUnheadDataRouterModeFiles(options: {
   }
 }
 
+function createHydratedDataRouterModeFiles(options: {
+  history: 'browser' | 'hash'
+  configBody: string
+  routesBody: string
+}): Record<string, string> {
+  const routerFactory =
+    options.history === 'browser' ? 'createBrowserRouter' : 'createHashRouter'
+
+  return {
+    'src/main.tsx': [
+      "import { StrictMode } from 'react'",
+      "import { hydrateRoot } from 'react-dom/client'",
+      `import { ${routerFactory}, RouterProvider } from 'react-router'`,
+      "import { routes } from './routes'",
+      '',
+      `const router = ${routerFactory}(routes, {`,
+      '  hydrationData: window.__staticRouterHydrationData,',
+      '})',
+      '',
+      "hydrateRoot(document.querySelector('#app')!,",
+      '  <StrictMode>',
+      '    <RouterProvider router={router} />',
+      '  </StrictMode>,',
+      ')',
+      '',
+    ].join('\n'),
+    'src/routes.tsx': options.routesBody,
+    'react-ssg.config.ts': [
+      `import { defineReactSsgConfig } from ${JSON.stringify(configEntryUrl)}`,
+      "import { routes } from './src/routes'",
+      '',
+      options.configBody,
+      '',
+    ].join('\n'),
+  }
+}
+
 afterEach(async () => {
   await rm(tempRoot, { recursive: true, force: true })
   await rm(resolvePlaygroundDistRoot('routes-browser'), { recursive: true, force: true })
@@ -338,6 +375,218 @@ describe('vite-plugin-react-ssg', () => {
       '✓ Static HTML generation completed: 3 total, 3 prerendered, 0 skipped',
     ])
     expectMessages(warn, [])
+  })
+
+  test('路由模式会在构建期执行 loader 并注入可复用的 hydration data', async () => {
+    const project = await createProject(
+      createHydratedDataRouterModeFiles({
+        history: 'browser',
+        configBody: [
+          'export default defineReactSsgConfig({',
+          "  history: 'browser',",
+          '  routes,',
+          '})',
+        ].join('\n'),
+        routesBody: [
+          "import { useLoaderData } from 'react-router'",
+          '',
+          'function HomePage() {',
+          '  const data = useLoaderData() as { message: string }',
+          '  return <p>{data.message}</p>',
+          '}',
+          '',
+          'export const routes = [',
+          '  {',
+          "    id: 'home',",
+          "    path: '/',",
+          "    loader: async () => ({ message: '来自 loader 的首页' }),",
+          '    Component: HomePage,',
+          '  },',
+          ']',
+          '',
+        ].join('\n'),
+      }),
+    )
+
+    await buildProject(project.root)
+
+    const html = await project.readDistFile('index.html')
+
+    expect(html).toContain('来自 loader 的首页')
+    expect(html).toContain('window.__staticRouterHydrationData = JSON.parse(')
+    expect(html).toContain('\\"home\\":{\\"message\\":\\"来自 loader 的首页\\"}')
+    expect(html).toContain('<div id="app"><p>来自 loader 的首页</p></div>')
+  })
+
+  test('路由模式会把显式 origin 传递给 loader 的 request.url', async () => {
+    const project = await createProject(
+      createHydratedDataRouterModeFiles({
+        history: 'browser',
+        configBody: [
+          'export default defineReactSsgConfig({',
+          "  history: 'browser',",
+          "  origin: 'https://docs.example.com',",
+          '  routes,',
+          '})',
+        ].join('\n'),
+        routesBody: [
+          "import { useLoaderData } from 'react-router'",
+          '',
+          'function HomePage() {',
+          '  const data = useLoaderData() as { origin: string }',
+          '  return <p>{data.origin}</p>',
+          '}',
+          '',
+          'export const routes = [',
+          '  {',
+          "    path: '/',",
+          '    loader: async ({ request }: { request: Request }) => ({',
+          '      origin: new URL(request.url).origin,',
+          '    }),',
+          '    Component: HomePage,',
+          '  },',
+          ']',
+          '',
+        ].join('\n'),
+      }),
+    )
+
+    await buildProject(project.root)
+
+    expect(await project.readDistFile('index.html')).toContain('https://docs.example.com')
+  })
+
+  test('未声明 origin 时仍会给 loader 提供稳定的默认 request.url', async () => {
+    const project = await createProject(
+      createHydratedDataRouterModeFiles({
+        history: 'browser',
+        configBody: [
+          'export default defineReactSsgConfig({',
+          "  history: 'browser',",
+          '  routes,',
+          '})',
+        ].join('\n'),
+        routesBody: [
+          "import { useLoaderData } from 'react-router'",
+          '',
+          'function HomePage() {',
+          '  const data = useLoaderData() as { origin: string }',
+          '  return <p>{data.origin}</p>',
+          '}',
+          '',
+          'export const routes = [',
+          '  {',
+          "    path: '/',",
+          '    loader: async ({ request }: { request: Request }) => ({',
+          '      origin: new URL(request.url).origin,',
+          '    }),',
+          '    Component: HomePage,',
+          '  },',
+          ']',
+          '',
+        ].join('\n'),
+      }),
+    )
+
+    await buildProject(project.root)
+
+    expect(await project.readDistFile('index.html')).toContain('http://localhost')
+  })
+
+  test('origin 非法时会按配置级失败回退到普通 CSR 构建', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const project = await createProject(
+      createHydratedDataRouterModeFiles({
+        history: 'browser',
+        configBody: [
+          'export default defineReactSsgConfig({',
+          "  history: 'browser',",
+          "  origin: '/relative-only',",
+          '  routes,',
+          '})',
+        ].join('\n'),
+        routesBody: [
+          'function HomePage() { return <p>不应预渲染</p> }',
+          '',
+          'export const routes = [',
+          '  {',
+          "    path: '/',",
+          '    Component: HomePage,',
+          '  },',
+          ']',
+          '',
+        ].join('\n'),
+      }),
+    )
+
+    await buildProject(project.root)
+
+    const html = await project.readDistFile('index.html')
+
+    expect(html).not.toContain('不应预渲染')
+    expectMessages(log, ['▲ React SSG', ''])
+    expectMessages(warn, [
+      '⚠ Invalid react-ssg.config.ts: route mode origin must be a valid absolute http(s) URL.',
+    ])
+  })
+
+  test('loader 返回短路 Response 时只跳过当前目标路径', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const project = await createProject(
+      createHydratedDataRouterModeFiles({
+        history: 'browser',
+        configBody: [
+          'export default defineReactSsgConfig({',
+          "  history: 'browser',",
+          "  paths: ['/protected'],",
+          '  routes,',
+          '})',
+        ].join('\n'),
+        routesBody: [
+          "import { Outlet, redirect } from 'react-router'",
+          '',
+          'function Layout() {',
+          '  return <main><Outlet /></main>',
+          '}',
+          '',
+          'function HomePage() { return <p>公开首页</p> }',
+          'function ProtectedPage() { return <p>不应出现的受保护内容</p> }',
+          '',
+          'export const routes = [',
+          '  {',
+          "    path: '/',",
+          '    Component: Layout,',
+          '    children: [',
+          '      { index: true, Component: HomePage },',
+          '      {',
+          "        path: 'protected',",
+          "        loader: async () => redirect('/login'),",
+          '        Component: ProtectedPage,',
+          '      },',
+          '    ],',
+          '  },',
+          ']',
+          '',
+        ].join('\n'),
+      }),
+    )
+
+    await buildProject(project.root)
+
+    expect(await project.readDistFile('index.html')).toContain('公开首页')
+    expect(await project.hasDistFile('protected/index.html')).toBe(false)
+    expectMessages(log, [
+      '▲ React SSG',
+      '',
+      '- Generating static HTML for 2 route(s)',
+      '',
+      '✓ Static HTML generation completed: 2 total, 1 prerendered, 1 skipped',
+    ])
+    expectMessages(warn, [
+      '⚠ Failed to prerender /protected. Falling back to CSR for this route. Reason: Received a Response with status 302 during static query.',
+    ])
   })
 
   test('hash data router 路由模式只输出默认首屏', async () => {
@@ -832,11 +1081,16 @@ describe('vite-plugin-react-ssg', () => {
     const postHtml = await readFile(path.join(playgroundDistRoot, 'posts', 'hello-world', 'index.html'), 'utf8')
 
     expect(indexHtml).toContain('自动发现静态路由')
+    expect(indexHtml).toContain('来自 loader 的首页内容')
     expect(indexHtml).toContain('<title>Routes Browser - 首页</title>')
     expect(indexHtml).toContain('name="robots" content="index,follow"')
-    expect(guideHtml).toContain('动态路径由 paths 补充')
+    expect(indexHtml).toContain('window.__staticRouterHydrationData = JSON.parse(')
+    expect(guideHtml).toContain('构建期执行 loader')
+    expect(guideHtml).toContain('https://playground.example.com')
+    expect(guideHtml).toContain('/guide')
     expect(guideHtml).toContain('content="Routes Browser 默认模板描述"')
     expect(postHtml).toContain('hello-world')
+    expect(postHtml).toContain('https://playground.example.com')
     expect(postHtml).toContain('property="og:image" content="https://example.com/og/hello-world.png"')
   })
 

@@ -3,6 +3,7 @@ import { routes } from './src/routes'
 
 export default defineReactSsgConfig({
   history: 'browser',
+  origin: 'https://playground.example.com',
   routes,
   paths: ['/posts/hello-world'],
 })

@@ -18,6 +18,7 @@ export interface ResolvedRouteConfig {
   mode: 'routes'
   history: HistoryMode
   routes: RouteObject[]
+  origin?: string
   paths: string[]
   logLevel: ReactSsgLogLevel
 }
@@ -79,6 +80,34 @@ function normalizeLogLevel(value: unknown): ReactSsgLogLevel | null {
   return null
 }
 
+function normalizeOrigin(value: unknown): string | undefined | null {
+  if (value === undefined) {
+    return undefined
+  }
+
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  try {
+    const url = new URL(value)
+
+    if (
+      (url.protocol !== 'http:' && url.protocol !== 'https:')
+      || url.pathname !== '/'
+      || url.search !== ''
+      || url.hash !== ''
+    ) {
+      return null
+    }
+
+    return url.origin
+  }
+  catch {
+    return null
+  }
+}
+
 function validateConfig(config: unknown): ConfigLoadResult {
   if (!config || typeof config !== 'object') {
     return {
@@ -105,6 +134,7 @@ function validateConfig(config: unknown): ConfigLoadResult {
 
   if (isRouteConfig(config as ReactSsgUserConfig)) {
     const routeConfig = config as RouteConfigInput
+    const origin = normalizeOrigin(routeConfig.origin)
 
     if (routeConfig.history !== 'browser' && routeConfig.history !== 'hash') {
       return {
@@ -120,6 +150,13 @@ function validateConfig(config: unknown): ConfigLoadResult {
       }
     }
 
+    if (origin === null) {
+      return {
+        kind: 'invalid',
+        message: 'Invalid react-ssg.config.ts: route mode origin must be a valid absolute http(s) URL.',
+      }
+    }
+
     return {
       kind: 'ok',
       config: {
@@ -128,6 +165,7 @@ function validateConfig(config: unknown): ConfigLoadResult {
         routes: routeConfig.routes,
         paths: normalizeUserPaths(routeConfig.paths),
         logLevel,
+        ...(origin !== undefined ? { origin } : {}),
       },
     }
   }
