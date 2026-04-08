@@ -74,13 +74,7 @@ Do not reference this repository's internal source files in the skill output unl
 Install the package in the consumer app. Follow the package README:
 
 ```bash
-pnpm add vite-plugin-react-ssg @unhead/react
-```
-
-or
-
-```bash
-npm install vite-plugin-react-ssg @unhead/react
+npm install vite-plugin-react-ssg
 ```
 
 Make sure the app already uses:
@@ -174,6 +168,28 @@ Use these rules when configuring route mode:
 
 Do not tell the user that dynamic routes will be auto-expanded. They will not. Provide concrete entries in `paths`.
 
+### Use async config to fetch dynamic paths at build time
+
+When the set of paths is not known statically, use an async config function to fetch them:
+
+```ts
+import { defineReactSsgConfig } from 'vite-plugin-react-ssg'
+import { routes } from './src/routes'
+
+export default defineReactSsgConfig(async () => {
+  const slugs: string[] = await fetch('https://example.com/api/posts')
+    .then(r => r.json())
+    .then(posts => posts.map((p: { slug: string }) => `/posts/${p.slug}`))
+
+  return {
+    history: 'browser',
+    origin: 'https://example.com',
+    routes,
+    paths: slugs,
+  }
+})
+```
+
 ## Support React Router loaders and hydration correctly
 
 This plugin supports React Router v6.4+ data-router loaders during prerendering.
@@ -214,43 +230,56 @@ Set `origin` when loaders depend on `request.url`, same-origin URL composition, 
 
 Use `@unhead/react` when the user wants page-level SEO metadata or social preview customization.
 
-Install and initialize the provider in the client entry:
+```bash
+npm install @unhead/react
+```
+
+Initialize the provider in the client entry. When combining with React Router loaders, wrap `RouterProvider` inside `UnheadProvider` and pass hydration data together:
 
 ```tsx
 import { StrictMode } from 'react'
 import { hydrateRoot } from 'react-dom/client'
 import { createHead, UnheadProvider } from '@unhead/react/client'
-import App from './App'
+import { createBrowserRouter, RouterProvider } from 'react-router'
+import { routes } from './routes'
 
 const head = createHead()
+const router = createBrowserRouter(routes, {
+  hydrationData: (window as any).__staticRouterHydrationData,
+})
 
 hydrateRoot(
-  document.getElementById('app')!,
+  document.querySelector('#app')!,
   <StrictMode>
     <UnheadProvider head={head}>
-      <App />
+      <RouterProvider router={router} />
     </UnheadProvider>
   </StrictMode>,
 )
 ```
 
-Set page metadata close to the route component:
+For app mode without React Router, replace `RouterProvider` with the root `<App />` component and omit `hydrationData`.
+
+Set page metadata inside the route component, typically combined with loader data:
 
 ```tsx
-import { useHead, useSeoMeta } from '@unhead/react'
+import { useLoaderData } from 'react-router'
+import { useSeoMeta } from '@unhead/react'
 
-useSeoMeta({
-  title: 'Product title',
-  description: 'Product summary',
-  ogTitle: 'Product title',
-  ogDescription: 'Product summary',
-  ogImage: 'https://example.com/og-image.png',
-  twitterCard: 'summary_large_image',
-})
+export function PostPage() {
+  const post = useLoaderData() as { title: string; summary: string }
 
-useHead({
-  meta: [{ property: 'og:type', content: 'article' }],
-})
+  useSeoMeta({
+    title: post.title,
+    description: post.summary,
+    ogTitle: post.title,
+    ogDescription: post.summary,
+    ogImage: 'https://example.com/og-image.png',
+    twitterCard: 'summary_large_image',
+  })
+
+  return <article>...</article>
+}
 ```
 
 Prefer `useSeoMeta` for standard SEO, Open Graph, and Twitter metadata. Use `useHead` for cases that need lower-level control.
